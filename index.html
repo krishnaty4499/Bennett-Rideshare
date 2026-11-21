@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bennett RideShare Matcher | SDG 11 & 13 Action Lab</title>
+<style>
+  :root {
+    --navy: #0f2544;
+    --blue: #1e4d8c;
+    --accent: #00a86b;
+    --bg: #f4f7fb;
+    --card: #ffffff;
+    --text: #1c2430;
+    --muted: #64748b;
+    --border: #e2e8f0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+  body { background: var(--bg); color: var(--text); padding-bottom: 40px; }
+  header {
+    background: linear-gradient(135deg, var(--navy), var(--blue));
+    color: white;
+    padding: 20px 16px;
+    text-align: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+  }
+  header h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  header p { font-size: 0.85rem; opacity: 0.9; }
+  .badge-row { margin-top: 10px; display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+  .badge { background: rgba(255,255,255,0.16); padding: 4px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+  .container { max-width: 980px; margin: 20px auto; padding: 0 16px; }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  }
+  .stat-card .num { font-size: 1.5rem; font-weight: 800; color: var(--blue); }
+  .stat-card .lbl { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+  .main-grid { display: grid; grid-template-columns: 1fr 1.4fr; gap: 18px; }
+  @media (max-width: 768px) { .main-grid { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .panel h2 { font-size: 1.1rem; color: var(--navy); margin-bottom: 12px; border-bottom: 2px solid var(--bg); padding-bottom: 8px; }
+  .form-group { margin-bottom: 11px; }
+  label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 4px; color: var(--text); }
+  input, select {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    background: #fff;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--blue); }
+  .fare-preview {
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    color: #0369a1;
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    margin-bottom: 10px;
+    line-height: 1.45;
+  }
+  .btn {
+    width: 100%;
+    padding: 11px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: white;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    margin-top: 4px;
+    transition: opacity 0.2s;
+  }
+  .btn:hover { opacity: 0.92; }
+  .safety-note {
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #065f46;
+    font-size: 0.78rem;
+    padding: 9px 11px;
+    border-radius: 8px;
+    margin-top: 10px;
+    line-height: 1.4;
+  }
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .filter-bar select { flex: 1; min-width: 140px; }
+  .empty-state {
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    padding: 36px 18px;
+    text-align: center;
+    color: var(--muted);
+    background: #fafcff;
+  }
+  .empty-state p { font-size: 0.9rem; margin-top: 6px; }
+  .ride-card {
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--blue);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+    background: #fafcff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+  }
+  .ride-info h3 { font-size: 0.95rem; color: var(--navy); }
+  .ride-meta { font-size: 0.8rem; color: var(--muted); margin-top: 4px; line-height: 1.45; }
+  .tag {
+    display: inline-block;
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+    margin-right: 4px;
+    margin-top: 4px;
+  }
+  .tag-mode { background: #e0f2fe; color: #0369a1; }
+  .tag-pref { background: #fef3c7; color: #92400e; }
+  .tag-dist { background: #dcfce7; color: #166534; }
+  .join-btn {
+    padding: 8px 12px;
+    background: var(--blue);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .join-btn.full { background: #94a3b8; cursor: not-allowed; }
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--navy);
+    color: white;
+    padding: 14px 18px;
+    border-radius: 10px;
+    border-left: 5px solid var(--accent);
+    font-size: 0.88rem;
+    max-width: 380px;
+    display: none;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.28);
+    z-index: 9999;
+    line-height: 1.4;
+  }
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 37, 68, 0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 16px;
+  }
+  .modal-box {
+    background: white;
+    border-radius: 14px;
+    max-width: 420px;
+    width: 100%;
+    padding: 20px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+    border-top: 5px solid var(--accent);
+  }
+  .modal-box h3 { color: var(--navy); font-size: 1.15rem; margin-bottom: 8px; }
+  .modal-box p { font-size: 0.88rem; color: var(--text); line-height: 1.5; margin-bottom: 14px; }
+  .modal-close {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    background: var(--blue);
+    color: white;
+    font-weight: 700;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Bennett RideShare Matcher</h1>
+  <p>BU100 SDG Action Lab • App-Benchmarked NCR Fare & Carpool Split</p>
+  <div class="badge-row">
+    <span class="badge">SDG 11: Sustainable Mobility</span>
+    <span class="badge">SDG 13: Carbon Reduction</span>
+    <span class="badge">@bennett.edu.in Verified</span>
+  </div>
+</header>
+
+<div class="container">
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="num" id="statRides">0</div>
+      <div class="lbl">Active Ride Slots Posted</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="statSeats">0</div>
+      <div class="lbl">Open Seats Available</div>
+    </div>
+    <div class="stat-card">
+      <div class="num">Depot & Pari Chowk</div>
+      <div class="lbl">Local Metro & Hub Routes</div>
+    </div>
+    <div class="stat-card">
+      <div class="num">Gate 1</div>
+      <div class="lbl">Designated Campus Pickup</div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div class="panel">
+      <h2>Post a Ride / Find Co-Riders</h2>
+      <form id="rideForm">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="riderName" placeholder="Enter your name" required>
+        </div>
+        <div class="form-group">
+          <label>Bennett University Email (@bennett.edu.in)</label>
+          <input type="email" id="riderEmail" placeholder="yourid@bennett.edu.in" required>
+        </div>
+        <div class="form-group">
+          <label>Route (Benchmark Distance from Gate 1)</label>
+          <select id="rideRoute" onchange="updateFarePreview()">
+            <option value="Bennett Gate 1 → Depot Metro Station (Aqua Line)">Bennett Gate 1 → Depot Metro Station (~9–10 km)</option>
+            <option value="Depot Metro Station → Bennett Gate 1">Depot Metro Station → Bennett Gate 1 (~9 km)</option>
+            <option value="Bennett Gate 1 → Pari Chowk">Bennett Gate 1 → Pari Chowk (~11 km)</option>
+            <option value="Pari Chowk → Bennett Gate 1">Pari Chowk → Bennett Gate 1 (~11 km)</option>
+            <option value="Bennett Gate 1 → Knowledge Park II Metro">Bennett Gate 1 → Knowledge Park II Metro (~14 km)</option>
+            <option value="Bennett Gate 1 → Noida Sector 62 / 52">Bennett Gate 1 → Noida Sector 62 / 52 (~35 km)</option>
+            <option value="Bennett Gate 1 → Ghaziabad (NH-24 / Indirapuram)">Bennett Gate 1 → Ghaziabad (NH-24 / Indirapuram) (~40 km)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Departure Time Window (15-min slot)</label>
+          <input type="time" id="rideTime" value="17:15" required>
+        </div>
+        <div class="form-group">
+          <label>Vehicle Mode & Split Capacity</label>
+          <select id="rideMode" onchange="updateFarePreview()">
+            <option value="Rapido / Uber / Ola Auto (3 riders total)">Rapido / Uber / Ola Auto (3 riders total)</option>
+            <option value="Uber / Ola Mini Cab (3 riders total)">Uber / Ola Mini Cab (3 riders total)</option>
+            <option value="Personal Carpool (4 riders total)">Personal Carpool (4 riders total)</option>
+          </select>
+        </div>
+        <div class="fare-preview" id="farePreview"></div>
+        <div class="form-group">
+          <label>Co-Rider Preference (Twist Safety Filter)</label>
+          <select id="ridePref">
+            <option value="Any Verified Student">Any Verified Student</option>
+            <option value="Female Students Only">Female Students Only</option>
+            <option value="Same Batch / First-Year">Same Batch / First-Year</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>WhatsApp / Contact Number</label>
+          <input type="tel" id="riderPhone" placeholder="98XXXXXXXX" required>
+        </div>
+        <button type="submit" class="btn">+ Publish Ride Slot</button>
+      </form>
+      <div class="safety-note">
+        <strong>App Fare Benchmark & Safety:</strong> Estimates reflect typical Greater Noida / Delhi-NCR Rapido, Uber, and Ola auto/cab rates (subject to live surge & traffic). Only @bennett.edu.in emails can post; pickups meet at <strong>Gate 1 Security Point</strong>.
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Live Departure Board (15-Min Match Windows)</h2>
+      <div class="filter-bar">
+        <select id="filterRoute" onchange="renderRides()">
+          <option value="ALL">All Routes</option>
+          <option value="Depot">Depot Metro Station (~9–10 km)</option>
+          <option value="Pari Chowk">Pari Chowk (~11 km)</option>
+          <option value="Knowledge Park II">Knowledge Park II Metro (~14 km)</option>
+          <option value="Noida">Noida (~35 km)</option>
+          <option value="Ghaziabad">Ghaziabad (~40 km)</option>
+        </select>
+        <select id="filterPref" onchange="renderRides()">
+          <option value="ALL">All Safety Preferences</option>
+          <option value="Any Verified Student">Any Verified Student</option>
+          <option value="Female Students Only">Female Students Only</option>
+        </select>
+      </div>
+      <div id="rideList"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-backdrop" id="bookingModal">
+  <div class="modal-box">
+    <h3 id="modalTitle">Slot Booked!</h3>
+    <p id="modalBody"></p>
+    <button class="modal-close" onclick="closeModal()">Done</button>
+  </div>
+</div>
+
+<script>
+const routeBenchmarks = {
+  "Bennett Gate 1 → Depot Metro Station (Aqua Line)": {
+    dist: "~9–10 km",
+    autoRange: "₹130–₹175", autoAvg: 150,
+    cabRange: "₹165–₹225", cabAvg: 195,
+    carFuelPool: 145
+  },
+  "Depot Metro Station → Bennett Gate 1": {
+    dist: "~9 km",
+    autoRange: "₹125–₹170", autoAvg: 145,
+    cabRange: "₹160–₹220", cabAvg: 190,
+    carFuelPool: 140
+  },
+  "Bennett Gate 1 → Pari Chowk": {
+    dist: "~11 km",
+    autoRange: "₹145–₹195", autoAvg: 170,
+    cabRange: "₹190–₹260", cabAvg: 225,
+    carFuelPool: 165
+  },
+  "Pari Chowk → Bennett Gate 1": {
+    dist: "~11 km",
+    autoRange: "₹145–₹195", autoAvg: 170,
+    cabRange: "₹190–₹260", cabAvg: 225,
+    carFuelPool: 165
+  },
+  "Bennett Gate 1 → Knowledge Park II Metro": {
+    dist: "~14 km",
+    autoRange: "₹180–₹240", autoAvg: 210,
+    cabRange: "₹240–₹320", cabAvg: 280,
+    carFuelPool: 210
+  },
+  "Bennett Gate 1 → Noida Sector 62 / 52": {
+    dist: "~35 km",
+    autoRange: "₹420–₹560", autoAvg: 490,
+    cabRange: "₹550–₹750", cabAvg: 650,
+    carFuelPool: 455
+  },
+  "Bennett Gate 1 → Ghaziabad (NH-24 / Indirapuram)": {
+    dist: "~40 km",
+    autoRange: "₹480–₹640", autoAvg: 560,
+    cabRange: "₹620–₹850", cabAvg: 735,
+    carFuelPool: 520
+  }
+};
+
+function calcSplit(route, modeStr) {
+  const b = routeBenchmarks[route] || routeBenchmarks["Bennett Gate 1 → Depot Metro Station (Aqua Line)"];
+  if (modeStr.includes("Auto")) {
+    const perHead = Math.round(b.autoAvg / 3);
+    return {
+      dist: b.dist,
+      appRef: `App Auto (${b.autoRange}, avg ₹${b.autoAvg})`,
+      label: `~₹${perHead}/head (3-way split of ~₹${b.autoAvg} auto)`
+    };
+  } else if (modeStr.includes("Cab")) {
+    const perHead = Math.round(b.cabAvg / 3);
+    return {
+      dist: b.dist,
+      appRef: `App Cab (${b.cabRange}, avg ₹${b.cabAvg})`,
+      label: `~₹${perHead}/head (3-way split of ~₹${b.cabAvg} cab)`
+    };
+  } else {
+    const perHead = Math.round(b.carFuelPool / 4);
+    return {
+      dist: b.dist,
+      appRef: `Carpool Fuel Est. (₹${b.carFuelPool} @ ~₹13/km share)`,
+      label: `~₹${perHead}/head (4-way fuel share of ₹${b.carFuelPool})`
+    };
+  }
+}
+
+function updateFarePreview() {
+  const route = document.getElementById('rideRoute').value;
+  const mode = document.getElementById('rideMode').value;
+  const calc = calcSplit(route, mode);
+  document.getElementById('farePreview').innerHTML =
+    `<strong>${calc.dist}</strong> • ${calc.appRef}<br>Split Estimate: <strong>${calc.label}</strong>`;
+}
+
+localStorage.removeItem('bennett_rides_v1');
+localStorage.removeItem('bennett_rides_v2');
+localStorage.removeItem('bennett_rides_v3');
+localStorage.removeItem('bennett_rides_v4');
+let rides = JSON.parse(localStorage.getItem('bennett_rides_v5')) || [];
+
+let toastTimer = null;
+
+function updateStats() {
+  document.getElementById('statRides').textContent = rides.length;
+  const totalSeats = rides.reduce((sum, r) => sum + r.seats, 0);
+  document.getElementById('statSeats').textContent = totalSeats;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.style.display = 'none'; }, 4500);
+}
+
+function openBookingPopup(title, bodyText) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').textContent = bodyText;
+  document.getElementById('bookingModal').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('bookingModal').style.display = 'none';
+}
+
+function renderRides() {
+  const list = document.getElementById('rideList');
+  const routeFilter = document.getElementById('filterRoute').value;
+  const prefFilter = document.getElementById('filterPref').value;
+
+  const filtered = rides.filter(r => {
+    const matchRoute = routeFilter === 'ALL' || r.route.includes(routeFilter);
+    const matchPref = prefFilter === 'ALL' || r.pref === prefFilter;
+    return matchRoute && matchPref;
+  });
+
+  updateStats();
+
+  if (filtered.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <strong>No ride slots posted yet</strong>
+        <p>Use the form on the left to publish a ride slot for Depot, Pari Chowk, KP II Metro, Noida, or Ghaziabad.</p>
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = filtered.map(r => `
+    <div class="ride-card">
+      <div class="ride-info">
+        <h3>${r.route} • <span style="color:#00a86b;">${r.time}</span></h3>
+        <div class="ride-meta">
+          Host: <strong>${r.name}</strong> (${r.email})<br>
+          Est. Cost: <strong>${r.farePerHead}</strong>
+        </div>
+        <div>
+          <span class="tag tag-dist">${r.dist}</span>
+          <span class="tag tag-mode">${r.mode} • ${r.seats} seat(s) left</span>
+          <span class="tag tag-pref">${r.pref}</span>
+        </div>
+      </div>
+      <button class="join-btn ${r.seats === 0 ? 'full' : ''}" ${r.seats === 0 ? 'disabled' : ''} onclick="joinRide(${r.id})">
+        ${r.seats === 0 ? 'Full' : 'Join Ride'}
+      </button>
+    </div>
+  `).join('');
+}
+
+function joinRide(id) {
+  const ride = rides.find(r => r.id === id);
+  if (!ride || ride.seats <= 0) return;
+  ride.seats -= 1;
+  localStorage.setItem('bennett_rides_v5', JSON.stringify(rides));
+  renderRides();
+  const msg = `Matched with ${ride.name} for ${ride.route} at ${ride.time}. Meet at Gate 1 Security Point. Contact: ${ride.phone} (${ride.farePerHead}).`;
+  showToast(msg);
+  openBookingPopup("Ride Slot Booked!", msg);
+}
+
+document.getElementById('rideForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const email = document.getElementById('riderEmail').value.trim().toLowerCase();
+  if (!email.endsWith('@bennett.edu.in')) {
+    showToast('Error: Only verified @bennett.edu.in emails can post rides!');
+    openBookingPopup("Verification Required", "Please enter a valid @bennett.edu.in university email address to publish a ride slot.");
+    return;
+  }
+  const route = document.getElementById('rideRoute').value;
+  const modeStr = document.getElementById('rideMode').value;
+  const seats = modeStr.includes('4 riders') ? 3 : 2;
+  const calc = calcSplit(route, modeStr);
+
+  const newRide = {
+    id: Date.now(),
+    name: document.getElementById('riderName').value.trim(),
+    email: email,
+    route: route,
+    dist: calc.dist,
+    time: document.getElementById('rideTime').value,
+    mode: modeStr.split(' (')[0],
+    seats: seats,
+    pref: document.getElementById('ridePref').value,
+    phone: document.getElementById('riderPhone').value.trim(),
+    farePerHead: calc.label
+  };
+  rides.unshift(newRide);
+  localStorage.setItem('bennett_rides_v5', JSON.stringify(rides));
+  this.reset();
+  updateFarePreview();
+  renderRides();
+  const msg = `Ride slot published for ${newRide.route} at ${newRide.time} (${newRide.farePerHead}).`;
+  showToast(msg);
+  openBookingPopup("Ride Slot Published!", msg);
+});
+
+updateFarePreview();
+renderRides();
+</script>
+</body>
+</html>

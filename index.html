@@ -28,6 +28,26 @@
   header p { font-size: 0.85rem; opacity: 0.9; }
   .badge-row { margin-top: 10px; display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
   .badge { background: rgba(255,255,255,0.16); padding: 4px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+  .sync-bar {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1e3a8a;
+    padding: 10px 14px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    font-size: 0.82rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .sync-pill {
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: #dbeafe;
+  }
   .container { max-width: 980px; margin: 20px auto; padding: 0 16px; }
   .stats-grid {
     display: grid;
@@ -211,6 +231,11 @@
 </header>
 
 <div class="container">
+  <div class="sync-bar" id="syncBar">
+    <span><strong>Cross-Device Sync:</strong> <span id="syncStatusText">Checking cloud sync...</span></span>
+    <span class="sync-pill" id="syncModeBadge">Loading</span>
+  </div>
+
   <div class="stats-grid">
     <div class="stat-card">
       <div class="num" id="statRides">0</div>
@@ -319,6 +344,8 @@
 </div>
 
 <script>
+const SHARED_CLOUD_URL = "https://api.npoint.io/6079f489534fb8c2ba5b";
+
 const routeBenchmarks = {
   "Bennett Gate 1 → Depot Metro Station (Aqua Line)": {
     dist: "~9–10 km",
@@ -398,17 +425,56 @@ function updateFarePreview() {
     `<strong>${calc.dist}</strong> • ${calc.appRef}<br>Split Estimate: <strong>${calc.label}</strong>`;
 }
 
-localStorage.removeItem('bennett_rides_v1');
-localStorage.removeItem('bennett_rides_v2');
-localStorage.removeItem('bennett_rides_v3');
-localStorage.removeItem('bennett_rides_v4');
 let rides = JSON.parse(localStorage.getItem('bennett_rides_v5')) || [];
-
 let toastTimer = null;
+
+function setSyncStatus(modeText, detailText) {
+  document.getElementById('syncModeBadge').textContent = modeText;
+  document.getElementById('syncStatusText').textContent = detailText;
+}
+
+async function loadRidesFromCloudOrLocal() {
+  if (!SHARED_CLOUD_URL) {
+    setSyncStatus("Local Browser Mode", "Slots save on this device only.");
+    renderRides();
+    return;
+  }
+  try {
+    const res = await fetch(SHARED_CLOUD_URL, { cache: "no-store" });
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      rides = data;
+      localStorage.setItem('bennett_rides_v5', JSON.stringify(rides));
+    } else if (data && Array.isArray(data.rides)) {
+      rides = data.rides;
+      localStorage.setItem('bennett_rides_v5', JSON.stringify(rides));
+    }
+    setSyncStatus("Cloud Synced", "Live slots shared across laptop, phone, and classmates.");
+  } catch (err) {
+    setSyncStatus("Offline Fallback", "Could not reach cloud DB; showing local slots.");
+  }
+  renderRides();
+}
+
+async function saveRides() {
+  localStorage.setItem('bennett_rides_v5', JSON.stringify(rides));
+  if (SHARED_CLOUD_URL) {
+    try {
+      await fetch(SHARED_CLOUD_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(rides)
+      });
+      setSyncStatus("Cloud Synced", "Just synced to shared database.");
+    } catch (err) {
+      setSyncStatus("Saved Locally", "Cloud write failed; saved in this browser.");
+    }
+  }
+}
 
 function updateStats() {
   document.getElementById('statRides').textContent = rides.length;
-  const totalSeats = rides.reduce((sum, r) => sum + r.seats, 0);
+  const totalSeats = rides.reduce((sum, r) => sum + Number(r.seats || 0), 0);
   document.getElementById('statSeats').textContent = totalSeats;
 }
 
@@ -436,7 +502,7 @@ function renderRides() {
   const prefFilter = document.getElementById('filterPref').value;
 
   const filtered = rides.filter(r => {
-    const matchRoute = routeFilter === 'ALL' || r.route.includes(routeFilter);
+    const matchRoute = routeFilter === 'ALL' || (r.route && r.route.includes(routeFilter));
     const matchPref = prefFilter === 'ALL' || r.pref === prefFilter;
     return matchRoute && matchPref;
   });
@@ -467,25 +533,25 @@ function renderRides() {
           <span class="tag tag-pref">${r.pref}</span>
         </div>
       </div>
-      <button class="join-btn ${r.seats === 0 ? 'full' : ''}" ${r.seats === 0 ? 'disabled' : ''} onclick="joinRide(${r.id})">
-        ${r.seats === 0 ? 'Full' : 'Join Ride'}
+      <button class="join-btn ${Number(r.seats) === 0 ? 'full' : ''}" ${Number(r.seats) === 0 ? 'disabled' : ''} onclick="joinRide(${r.id})">
+        ${Number(r.seats) === 0 ? 'Full' : 'Join Ride'}
       </button>
     </div>
   `).join('');
 }
 
-function joinRide(id) {
+async function joinRide(id) {
   const ride = rides.find(r => r.id === id);
-  if (!ride || ride.seats <= 0) return;
-  ride.seats -= 1;
-  localStorage.setItem('bennett_rides_v5', JSON.stringify(rides));
+  if (!ride || Number(ride.seats) <= 0) return;
+  ride.seats = Number(ride.seats) - 1;
+  await saveRides();
   renderRides();
   const msg = `Matched with ${ride.name} for ${ride.route} at ${ride.time}. Meet at Gate 1 Security Point. Contact: ${ride.phone} (${ride.farePerHead}).`;
   showToast(msg);
   openBookingPopup("Ride Slot Booked!", msg);
 }
 
-document.getElementById('rideForm').addEventListener('submit', function(e) {
+document.getElementById('rideForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   const email = document.getElementById('riderEmail').value.trim().toLowerCase();
   if (!email.endsWith('@bennett.edu.in')) {
@@ -512,7 +578,7 @@ document.getElementById('rideForm').addEventListener('submit', function(e) {
     farePerHead: calc.label
   };
   rides.unshift(newRide);
-  localStorage.setItem('bennett_rides_v5', JSON.stringify(rides));
+  await saveRides();
   this.reset();
   updateFarePreview();
   renderRides();
@@ -522,7 +588,10 @@ document.getElementById('rideForm').addEventListener('submit', function(e) {
 });
 
 updateFarePreview();
-renderRides();
+loadRidesFromCloudOrLocal();
+if (SHARED_CLOUD_URL) {
+  setInterval(loadRidesFromCloudOrLocal, 6000);
+}
 </script>
 </body>
 </html>

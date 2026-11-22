@@ -233,7 +233,10 @@
 <div class="container">
   <div class="sync-bar" id="syncBar">
     <span><strong>Cross-Device Sync:</strong> <span id="syncStatusText">Checking cloud sync...</span></span>
-    <span class="sync-pill" id="syncModeBadge">Loading</span>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="sync-pill" id="syncModeBadge">Loading</span>
+      <button type="button" id="toggleCloudBtn" onclick="toggleCloudSync()" style="padding:4px 10px;border:1px solid #93c5fd;background:#fff;color:#1e3a8a;border-radius:999px;font-size:0.75rem;font-weight:700;cursor:pointer;">Toggle Cloud</button>
+    </div>
   </div>
 
   <div class="stats-grid">
@@ -345,6 +348,20 @@
 
 <script>
 const SHARED_CLOUD_URL = "https://api.npoint.io/6079f489534fb8c2ba5b";
+let cloudSyncEnabled = localStorage.getItem('bennett_cloud_enabled') !== 'false';
+
+function updateCloudToggleLabel() {
+  const btn = document.getElementById('toggleCloudBtn');
+  if (!btn) return;
+  btn.textContent = cloudSyncEnabled ? "Cloud: ON (Click to disable)" : "Cloud: OFF (Local mode)";
+}
+
+function toggleCloudSync() {
+  cloudSyncEnabled = !cloudSyncEnabled;
+  localStorage.setItem('bennett_cloud_enabled', String(cloudSyncEnabled));
+  updateCloudToggleLabel();
+  loadRidesFromCloudOrLocal();
+}
 
 const routeBenchmarks = {
   "Bennett Gate 1 → Depot Metro Station (Aqua Line)": {
@@ -481,7 +498,7 @@ function filterTodayRides(list) {
 }
 
 async function loadRidesFromCloudOrLocal() {
-  if (!SHARED_CLOUD_URL) {
+  if (!SHARED_CLOUD_URL || !cloudSyncEnabled) {
     rides = filterTodayRides(rides);
     localStorage.setItem('bennett_rides_v5', JSON.stringify(rides));
     setSyncStatus("Local Browser Mode", "Today's slots only.");
@@ -511,7 +528,7 @@ async function loadRidesFromCloudOrLocal() {
 async function saveRides() {
   rides = filterTodayRides(rides);
   localStorage.setItem('bennett_rides_v5', JSON.stringify(rides));
-  if (SHARED_CLOUD_URL) {
+  if (SHARED_CLOUD_URL && cloudSyncEnabled) {
     try {
       await fetch(SHARED_CLOUD_URL, {
         method: "POST",
@@ -642,11 +659,17 @@ document.getElementById('rideForm').addEventListener('submit', async function(e)
   openBookingPopup("Ride Slot Published!", msg);
 });
 
+updateCloudToggleLabel();
 updateFarePreview();
 loadRidesFromCloudOrLocal();
-if (SHARED_CLOUD_URL) {
-  setInterval(loadRidesFromCloudOrLocal, 6000);
-}
+setInterval(() => {
+  if (SHARED_CLOUD_URL && cloudSyncEnabled) {
+    loadRidesFromCloudOrLocal();
+  } else {
+    rides = filterTodayRides(rides);
+    renderRides();
+  }
+}, 6000);
 </script>
 </body>
 </html>

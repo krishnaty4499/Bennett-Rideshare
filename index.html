@@ -217,4 +217,436 @@
     cursor: pointer;
   }
 </style>
-</
+</head>
+<body>
+
+<header>
+  <h1>Bennett RideShare Matcher</h1>
+  <p>BU100 SDG Action Lab • App-Benchmarked NCR Fare & Carpool Split</p>
+  <div class="badge-row">
+    <span class="badge">SDG 11: Sustainable Mobility</span>
+    <span class="badge">SDG 13: Carbon Reduction</span>
+    <span class="badge">@bennett.edu.in Verified</span>
+  </div>
+</header>
+
+<div class="container">
+  <div class="sync-bar" id="syncBar">
+    <span><strong>Cross-Device Sync:</strong> <span id="syncStatusText">Checking cloud sync...</span></span>
+    <span class="sync-pill" id="syncModeBadge">Loading</span>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="num" id="statRides">0</div>
+      <div class="lbl">Active Ride Slots Posted</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="statSeats">0</div>
+      <div class="lbl">Open Seats Available</div>
+    </div>
+    <div class="stat-card">
+      <div class="num">Depot & Pari Chowk</div>
+      <div class="lbl">Local Metro & Hub Routes</div>
+    </div>
+    <div class="stat-card">
+      <div class="num">Gate 1</div>
+      <div class="lbl">Designated Campus Pickup</div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div class="panel">
+      <h2>Post a Ride / Find Co-Riders</h2>
+      <form id="rideForm">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="riderName" placeholder="Enter your name" required>
+        </div>
+        <div class="form-group">
+          <label>Bennett University Email (@bennett.edu.in)</label>
+          <input type="email" id="riderEmail" placeholder="yourid@bennett.edu.in" required>
+        </div>
+        <div class="form-group">
+          <label>Route (Benchmark Distance from Gate 1)</label>
+          <select id="rideRoute" onchange="updateFarePreview()">
+            <option value="Bennett Gate 1 → Depot Metro Station (Aqua Line)">Bennett Gate 1 → Depot Metro Station (~9–10 km)</option>
+            <option value="Depot Metro Station → Bennett Gate 1">Depot Metro Station → Bennett Gate 1 (~9 km)</option>
+            <option value="Bennett Gate 1 → Pari Chowk">Bennett Gate 1 → Pari Chowk (~11 km)</option>
+            <option value="Pari Chowk → Bennett Gate 1">Pari Chowk → Bennett Gate 1 (~11 km)</option>
+            <option value="Bennett Gate 1 → Knowledge Park II Metro">Bennett Gate 1 → Knowledge Park II Metro (~14 km)</option>
+            <option value="Bennett Gate 1 → Noida Sector 62 / 52">Bennett Gate 1 → Noida Sector 62 / 52 (~35 km)</option>
+            <option value="Bennett Gate 1 → Ghaziabad (NH-24 / Indirapuram)">Bennett Gate 1 → Ghaziabad (NH-24 / Indirapuram) (~40 km)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Departure Time Window (15-min slot)</label>
+          <input type="time" id="rideTime" value="17:15" required>
+        </div>
+        <div class="form-group">
+          <label>Vehicle Mode & Split Capacity</label>
+          <select id="rideMode" onchange="updateFarePreview()">
+            <option value="Rapido / Uber / Ola Auto (3 riders total)">Rapido / Uber / Ola Auto (3 riders total)</option>
+            <option value="Uber / Ola Mini Cab (3 riders total)">Uber / Ola Mini Cab (3 riders total)</option>
+            <option value="Personal Carpool (4 riders total)">Personal Carpool (4 riders total)</option>
+          </select>
+        </div>
+        <div class="fare-preview" id="farePreview"></div>
+        <div class="form-group">
+          <label>Co-Rider Preference (Twist Safety Filter)</label>
+          <select id="ridePref">
+            <option value="Any Verified Student">Any Verified Student</option>
+            <option value="Female Students Only">Female Students Only</option>
+            <option value="Same Batch / First-Year">Same Batch / First-Year</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>WhatsApp / Contact Number</label>
+          <input type="tel" id="riderPhone" placeholder="98XXXXXXXX" required>
+        </div>
+        <button type="submit" class="btn">+ Publish Ride Slot</button>
+      </form>
+      <div class="safety-note">
+        <strong>App Fare Benchmark & Safety:</strong> Estimates reflect typical Greater Noida / Delhi-NCR Rapido, Uber, and Ola auto/cab rates (subject to live surge & traffic). Only @bennett.edu.in emails can post; pickups meet at <strong>Gate 1 Security Point</strong>.
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Live Departure Board (15-Min Match Windows)</h2>
+      <div class="filter-bar">
+        <select id="filterRoute" onchange="renderRides()">
+          <option value="ALL">All Routes</option>
+          <option value="Depot">Depot Metro Station (~9–10 km)</option>
+          <option value="Pari Chowk">Pari Chowk (~11 km)</option>
+          <option value="Knowledge Park II">Knowledge Park II Metro (~14 km)</option>
+          <option value="Noida">Noida (~35 km)</option>
+          <option value="Ghaziabad">Ghaziabad (~40 km)</option>
+        </select>
+        <select id="filterPref" onchange="renderRides()">
+          <option value="ALL">All Safety Preferences</option>
+          <option value="Any Verified Student">Any Verified Student</option>
+          <option value="Female Students Only">Female Students Only</option>
+        </select>
+      </div>
+      <div id="rideList"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-backdrop" id="bookingModal">
+  <div class="modal-box">
+    <h3 id="modalTitle">Slot Booked!</h3>
+    <p id="modalBody"></p>
+    <button class="modal-close" onclick="closeModal()">Done</button>
+  </div>
+</div>
+
+<script>
+const SHARED_CLOUD_URL = "https://api.npoint.io/6079f489534fb8c2ba5b";
+
+const routeBenchmarks = {
+  "Bennett Gate 1 → Depot Metro Station (Aqua Line)": {
+    dist: "~9–10 km",
+    autoRange: "₹130–₹175", autoAvg: 150,
+    cabRange: "₹165–₹225", cabAvg: 195,
+    carFuelPool: 145
+  },
+  "Depot Metro Station → Bennett Gate 1": {
+    dist: "~9 km",
+    autoRange: "₹125–₹170", autoAvg: 145,
+    cabRange: "₹160–₹220", cabAvg: 190,
+    carFuelPool: 140
+  },
+  "Bennett Gate 1 → Pari Chowk": {
+    dist: "~11 km",
+    autoRange: "₹145–₹195", autoAvg: 170,
+    cabRange: "₹190–₹260", cabAvg: 225,
+    carFuelPool: 165
+  },
+  "Pari Chowk → Bennett Gate 1": {
+    dist: "~11 km",
+    autoRange: "₹145–₹195", autoAvg: 170,
+    cabRange: "₹190–₹260", cabAvg: 225,
+    carFuelPool: 165
+  },
+  "Bennett Gate 1 → Knowledge Park II Metro": {
+    dist: "~14 km",
+    autoRange: "₹180–₹240", autoAvg: 210,
+    cabRange: "₹240–₹320", cabAvg: 280,
+    carFuelPool: 210
+  },
+  "Bennett Gate 1 → Noida Sector 62 / 52": {
+    dist: "~35 km",
+    autoRange: "₹420–₹560", autoAvg: 490,
+    cabRange: "₹550–₹750", cabAvg: 650,
+    carFuelPool: 455
+  },
+  "Bennett Gate 1 → Ghaziabad (NH-24 / Indirapuram)": {
+    dist: "~40 km",
+    autoRange: "₹480–₹640", autoAvg: 560,
+    cabRange: "₹620–₹850", cabAvg: 735,
+    carFuelPool: 520
+  }
+};
+
+function calcSplit(route, modeStr) {
+  const b = routeBenchmarks[route] || routeBenchmarks["Bennett Gate 1 → Depot Metro Station (Aqua Line)"];
+  if (modeStr.includes("Auto")) {
+    const perHead = Math.round(b.autoAvg / 3);
+    return {
+      dist: b.dist,
+      appRef: `App Auto (${b.autoRange}, avg ₹${b.autoAvg})`,
+      label: `~₹${perHead}/head (3-way split of ~₹${b.autoAvg} auto)`
+    };
+  } else if (modeStr.includes("Cab")) {
+    const perHead = Math.round(b.cabAvg / 3);
+    return {
+      dist: b.dist,
+      appRef: `App Cab (${b.cabRange}, avg ₹${b.cabAvg})`,
+      label: `~₹${perHead}/head (3-way split of ~₹${b.cabAvg} cab)`
+    };
+  } else {
+    const perHead = Math.round(b.carFuelPool / 4);
+    return {
+      dist: b.dist,
+      appRef: `Carpool Fuel Est. (₹${b.carFuelPool} @ ~₹13/km share)`,
+      label: `~₹${perHead}/head (4-way fuel share of ₹${b.carFuelPool})`
+    };
+  }
+}
+
+function updateFarePreview() {
+  const route = document.getElementById('rideRoute').value;
+  const mode = document.getElementById('rideMode').value;
+  const calc = calcSplit(route, mode);
+  document.getElementById('farePreview').innerHTML =
+    `<strong>${calc.dist}</strong> • ${calc.appRef}<br>Split Estimate: <strong>${calc.label}</strong>`;
+}
+
+let rides = [];
+try {
+  rides = JSON.parse(localStorage.getItem('bennett_rides_v5')) || [];
+  if (!Array.isArray(rides)) rides = [];
+} catch (e) {
+  rides = [];
+}
+let toastTimer = null;
+
+function setSyncStatus(modeText, detailText) {
+  document.getElementById('syncModeBadge').textContent = modeText;
+  document.getElementById('syncStatusText').textContent = detailText;
+}
+
+function isSameDay(timestampMs) {
+  if (!timestampMs) return true;
+  const d = new Date(Number(timestampMs));
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+
+function isWithinDepartureGraceWindow(ride) {
+  if (!ride || !ride.time) return true;
+  const parts = String(ride.time).split(":");
+  if (parts.length < 2) return true;
+  const hours = Number(parts[0]);
+  const minutes = Number(parts[1]);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return true;
+
+  const baseDate = (ride.createdAt || ride.id) ? new Date(Number(ride.createdAt || ride.id)) : new Date();
+  const depDate = new Date(
+    baseDate.getFullYear(),
+    baseDate.getMonth(),
+    baseDate.getDate(),
+    hours,
+    minutes,
+    0,
+    0
+  );
+  if (depDate.getTime() < baseDate.getTime() - 6 * 60 * 60 * 1000) {
+    depDate.setDate(depDate.getDate() + 1);
+  }
+  const expiryMs = depDate.getTime() + 15 * 60 * 1000;
+  return Date.now() <= expiryMs;
+}
+
+function filterTodayRides(list) {
+  if (!Array.isArray(list)) return [];
+  return list.filter(r => r && isSameDay(r.createdAt || r.id) && isWithinDepartureGraceWindow(r));
+}
+
+async function loadRidesFromCloudOrLocal() {
+  if (!SHARED_CLOUD_URL) {
+    rides = filterTodayRides(rides);
+    localStorage.setItem('bennett_rides_v5', JSON.stringify(rides));
+    setSyncStatus("Local Browser Mode", "Today's slots only.");
+    renderRides();
+    return;
+  }
+  try {
+    const res = await fetch(SHARED_CLOUD_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("Network response not ok");
+    const data = await res.json();
+    let incoming = [];
+    if (Array.isArray(data)) {
+      incoming = data;
+    } else if (data && Array.isArray(data.rides)) {
+      incoming = data.rides;
+    }
+    rides = filterTodayRides(incoming);
+    localStorage.setItem('bennett_rides_v5', JSON.stringify(rides));
+    setSyncStatus("Cloud Synced", "Showing today's slots across devices.");
+  } catch (err) {
+    rides = filterTodayRides(rides);
+    setSyncStatus("Offline Fallback", "Showing today's local slots.");
+  }
+  renderRides();
+}
+
+async function saveRides() {
+  rides = filterTodayRides(rides);
+  localStorage.setItem('bennett_rides_v5', JSON.stringify(rides));
+  if (SHARED_CLOUD_URL) {
+    try {
+      await fetch(SHARED_CLOUD_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(rides)
+      });
+      setSyncStatus("Cloud Synced", "Just synced today's slots.");
+    } catch (err) {
+      setSyncStatus("Saved Locally", "Cloud write failed; saved in this browser.");
+    }
+  }
+}
+
+function updateStats() {
+  document.getElementById('statRides').textContent = rides.length;
+  const totalSeats = rides.reduce((sum, r) => sum + Number(r.seats || 0), 0);
+  document.getElementById('statSeats').textContent = totalSeats;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.style.display = 'none'; }, 4500);
+}
+
+function openBookingPopup(title, bodyText) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').textContent = bodyText;
+  document.getElementById('bookingModal').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('bookingModal').style.display = 'none';
+}
+
+function renderRides() {
+  const list = document.getElementById('rideList');
+  const routeFilter = document.getElementById('filterRoute').value;
+  const prefFilter = document.getElementById('filterPref').value;
+
+  const filtered = rides.filter(r => {
+    const matchRoute = routeFilter === 'ALL' || (r.route && r.route.includes(routeFilter));
+    const matchPref = prefFilter === 'ALL' || r.pref === prefFilter;
+    return matchRoute && matchPref;
+  });
+
+  updateStats();
+
+  if (filtered.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <strong>No ride slots posted today</strong>
+        <p>Use the form on the left to publish a ride slot for Depot, Pari Chowk, KP II Metro, Noida, or Ghaziabad.</p>
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = filtered.map(r => `
+    <div class="ride-card">
+      <div class="ride-info">
+        <h3>${r.route} • <span style="color:#00a86b;">${r.time}</span></h3>
+        <div class="ride-meta">
+          Host: <strong>${r.name}</strong> (${r.email})<br>
+          Est. Cost: <strong>${r.farePerHead}</strong>
+        </div>
+        <div>
+          <span class="tag tag-dist">${r.dist}</span>
+          <span class="tag tag-mode">${r.mode} • ${r.seats} seat(s) left</span>
+          <span class="tag tag-pref">${r.pref}</span>
+        </div>
+      </div>
+      <button class="join-btn ${Number(r.seats) === 0 ? 'full' : ''}" ${Number(r.seats) === 0 ? 'disabled' : ''} onclick="joinRide(${r.id})">
+        ${Number(r.seats) === 0 ? 'Full' : 'Join Ride'}
+      </button>
+    </div>
+  `).join('');
+}
+
+async function joinRide(id) {
+  const ride = rides.find(r => r.id === id);
+  if (!ride || Number(ride.seats) <= 0) return;
+  ride.seats = Number(ride.seats) - 1;
+  await saveRides();
+  renderRides();
+  const msg = `Matched with ${ride.name} for ${ride.route} at ${ride.time}. Meet at Gate 1 Security Point. Contact: ${ride.phone} (${ride.farePerHead}).`;
+  showToast(msg);
+  openBookingPopup("Ride Slot Booked!", msg);
+}
+
+document.getElementById('rideForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const email = document.getElementById('riderEmail').value.trim().toLowerCase();
+  if (!email.endsWith('@bennett.edu.in')) {
+    showToast('Error: Only verified @bennett.edu.in emails can post rides!');
+    openBookingPopup("Verification Required", "Please enter a valid @bennett.edu.in university email address to publish a ride slot.");
+    return;
+  }
+  const route = document.getElementById('rideRoute').value;
+  const modeStr = document.getElementById('rideMode').value;
+  const seats = modeStr.includes('4 riders') ? 3 : 2;
+  const calc = calcSplit(route, modeStr);
+  const nowMs = Date.now();
+
+  const newRide = {
+    id: nowMs,
+    createdAt: nowMs,
+    name: document.getElementById('riderName').value.trim(),
+    email: email,
+    route: route,
+    dist: calc.dist,
+    time: document.getElementById('rideTime').value,
+    mode: modeStr.split(' (')[0],
+    seats: seats,
+    pref: document.getElementById('ridePref').value,
+    phone: document.getElementById('riderPhone').value.trim(),
+    farePerHead: calc.label
+  };
+  rides.unshift(newRide);
+  await saveRides();
+  this.reset();
+  updateFarePreview();
+  renderRides();
+  const msg = `Ride slot published for ${newRide.route} at ${newRide.time} (${newRide.farePerHead}).`;
+  showToast(msg);
+  openBookingPopup("Ride Slot Published!", msg);
+});
+
+updateFarePreview();
+loadRidesFromCloudOrLocal();
+if (SHARED_CLOUD_URL) {
+  setInterval(loadRidesFromCloudOrLocal, 6000);
+}
+</script>
+</body>
+</html>
